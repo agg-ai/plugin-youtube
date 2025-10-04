@@ -307,20 +307,120 @@ public class Search extends AbstractYoutubeTask implements RunnableTask<Search.O
     @Schema(title = "Page token", description = "Token for pagination to retrieve the next page of results")
     private Property<String> pageToken;
 
+    /**
+     * Safely parse enum from string, case-insensitive
+     */
+    private <T extends Enum<T>> T parseEnumCaseInsensitive(String value, Class<T> enumClass) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            // Try exact match first
+            return Enum.valueOf(enumClass, value);
+        } catch (IllegalArgumentException e) {
+            // Try case-insensitive match
+            for (T enumConstant : enumClass.getEnumConstants()) {
+                if (enumConstant.name().equalsIgnoreCase(value)) {
+                    return enumConstant;
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Safely render enum property with case-insensitive parsing
+     */
+    @SuppressWarnings("unchecked")
+    private <T extends Enum<T>> T safeRenderEnum(RunContext runContext, Property property, Class<T> enumClass) {
+        if (property == null) {
+            return null;
+        }
+        try {
+            // First try direct enum parsing
+            Object rendered = runContext.render(property).as(enumClass).orElse(null);
+            if (rendered != null && enumClass.isInstance(rendered)) {
+                return (T) rendered;
+            }
+        } catch (Exception e) {
+            // Fall through to string parsing
+        }
+
+        // Fallback to string parsing with case-insensitive matching
+        try {
+            Object rendered = runContext.render(property).as(String.class).orElse(null);
+            if (rendered instanceof String) {
+                return parseEnumCaseInsensitive((String) rendered, enumClass);
+            }
+        } catch (Exception ex) {
+            // Ignore and return null
+        }
+        return null;
+    }
+
+    /**
+     * Safely render list of enums with case-insensitive parsing
+     */
+    @SuppressWarnings("unchecked")
+    private <T extends Enum<T>> List<T> safeRenderEnumList(RunContext runContext, Property property,
+            Class<T> enumClass) {
+        if (property == null) {
+            return null;
+        }
+        try {
+            // First try direct list parsing
+            List renderedList = (List) runContext.render(property).asList(enumClass);
+            if (renderedList != null && !renderedList.isEmpty()) {
+                List<T> result = new ArrayList<>();
+                for (Object item : renderedList) {
+                    if (enumClass.isInstance(item)) {
+                        result.add((T) item);
+                    }
+                }
+                if (!result.isEmpty()) {
+                    return result;
+                }
+            }
+        } catch (Exception e) {
+            // Fall through to string parsing
+        }
+
+        // Fallback to string list parsing with case-insensitive matching
+        try {
+            List renderedList = (List) runContext.render(property).asList(String.class);
+            if (renderedList != null && !renderedList.isEmpty()) {
+                List<T> result = new ArrayList<>();
+                for (Object item : renderedList) {
+                    if (item instanceof String) {
+                        T enumValue = parseEnumCaseInsensitive((String) item, enumClass);
+                        if (enumValue != null) {
+                            result.add(enumValue);
+                        }
+                    }
+                }
+                return result.isEmpty() ? null : result;
+            }
+        } catch (Exception ex) {
+            // Ignore and return null
+        }
+        return null;
+    }
+
     @Override
     public Output run(RunContext runContext) throws Exception {
         YouTube youtube = createYoutubeService(runContext);
 
-        // Render all parameters
+        // Render all parameters with safe enum parsing
         String renderedQuery = this.query != null ? runContext.render(this.query).as(String.class).orElse(null) : null;
-        List<ResourceType> renderedTypes = this.resourceType != null
-                ? runContext.render(this.resourceType).asList(ResourceType.class)
-                : null;
+        List<ResourceType> renderedTypes = safeRenderEnumList(runContext, this.resourceType, ResourceType.class);
         String renderedChannelId = this.channelId != null
                 ? runContext.render(this.channelId).as(String.class).orElse(null)
                 : null;
         Integer renderedMaxResults = runContext.render(this.maxResults).as(Integer.class).orElse(25);
-        Order renderedOrder = runContext.render(this.order).as(Order.class).orElse(Order.RELEVANCE);
+        Order renderedOrder = safeRenderEnum(runContext, this.order, Order.class);
+        if (renderedOrder == null) {
+            renderedOrder = Order.RELEVANCE;
+        }
         String renderedPublishedAfter = this.publishedAfter != null
                 ? runContext.render(this.publishedAfter).as(String.class).orElse(null)
                 : null;
@@ -333,47 +433,27 @@ public class Search extends AbstractYoutubeTask implements RunnableTask<Search.O
         String renderedRelevanceLanguage = this.relevanceLanguage != null
                 ? runContext.render(this.relevanceLanguage).as(String.class).orElse(null)
                 : null;
-        SafeSearch renderedSafeSearch = this.safeSearch != null
-                ? runContext.render(this.safeSearch).as(SafeSearch.class).orElse(null)
-                : null;
+        SafeSearch renderedSafeSearch = safeRenderEnum(runContext, this.safeSearch, SafeSearch.class);
         String renderedTopicId = this.topicId != null ? runContext.render(this.topicId).as(String.class).orElse(null)
                 : null;
-        VideoCaption renderedVideoCaption = this.videoCaption != null
-                ? runContext.render(this.videoCaption).as(VideoCaption.class).orElse(null)
-                : null;
+        VideoCaption renderedVideoCaption = safeRenderEnum(runContext, this.videoCaption, VideoCaption.class);
         String renderedVideoCategoryId = this.videoCategoryId != null
                 ? runContext.render(this.videoCategoryId).as(String.class).orElse(null)
                 : null;
-        VideoDefinition renderedVideoDefinition = this.videoDefinition != null
-                ? runContext.render(this.videoDefinition).as(VideoDefinition.class).orElse(null)
-                : null;
-        VideoDimension renderedVideoDimension = this.videoDimension != null
-                ? runContext.render(this.videoDimension).as(VideoDimension.class).orElse(null)
-                : null;
-        VideoDuration renderedVideoDuration = this.videoDuration != null
-                ? runContext.render(this.videoDuration).as(VideoDuration.class).orElse(null)
-                : null;
-        VideoEmbeddable renderedVideoEmbeddable = this.videoEmbeddable != null
-                ? runContext.render(this.videoEmbeddable).as(VideoEmbeddable.class).orElse(null)
-                : null;
-        VideoLicense renderedVideoLicense = this.videoLicense != null
-                ? runContext.render(this.videoLicense).as(VideoLicense.class).orElse(null)
-                : null;
-        VideoPaidProductPlacement renderedVideoPaidProductPlacement = this.videoPaidProductPlacement != null
-                ? runContext.render(this.videoPaidProductPlacement).as(VideoPaidProductPlacement.class).orElse(null)
-                : null;
-        VideoSyndicated renderedVideoSyndicated = this.videoSyndicated != null
-                ? runContext.render(this.videoSyndicated).as(VideoSyndicated.class).orElse(null)
-                : null;
-        VideoType renderedVideoType = this.videoType != null
-                ? runContext.render(this.videoType).as(VideoType.class).orElse(null)
-                : null;
-        EventType renderedEventType = this.eventType != null
-                ? runContext.render(this.eventType).as(EventType.class).orElse(null)
-                : null;
-        ChannelType renderedChannelType = this.channelType != null
-                ? runContext.render(this.channelType).as(ChannelType.class).orElse(null)
-                : null;
+        VideoDefinition renderedVideoDefinition = safeRenderEnum(runContext, this.videoDefinition,
+                VideoDefinition.class);
+        VideoDimension renderedVideoDimension = safeRenderEnum(runContext, this.videoDimension, VideoDimension.class);
+        VideoDuration renderedVideoDuration = safeRenderEnum(runContext, this.videoDuration, VideoDuration.class);
+        VideoEmbeddable renderedVideoEmbeddable = safeRenderEnum(runContext, this.videoEmbeddable,
+                VideoEmbeddable.class);
+        VideoLicense renderedVideoLicense = safeRenderEnum(runContext, this.videoLicense, VideoLicense.class);
+        VideoPaidProductPlacement renderedVideoPaidProductPlacement = safeRenderEnum(runContext,
+                this.videoPaidProductPlacement, VideoPaidProductPlacement.class);
+        VideoSyndicated renderedVideoSyndicated = safeRenderEnum(runContext, this.videoSyndicated,
+                VideoSyndicated.class);
+        VideoType renderedVideoType = safeRenderEnum(runContext, this.videoType, VideoType.class);
+        EventType renderedEventType = safeRenderEnum(runContext, this.eventType, EventType.class);
+        ChannelType renderedChannelType = safeRenderEnum(runContext, this.channelType, ChannelType.class);
         Boolean renderedForMine = this.forMine != null ? runContext.render(this.forMine).as(Boolean.class).orElse(null)
                 : null;
         String renderedPageToken = this.pageToken != null
@@ -475,61 +555,117 @@ public class Search extends AbstractYoutubeTask implements RunnableTask<Search.O
         List<SearchResult> searchResults = response.getItems();
 
         // Process results and categorize by type
-        List<SearchResultItem> items = new ArrayList<>();
+        List<Item> items = new ArrayList<>();
         int videoCount = 0;
         int channelCount = 0;
         int playlistCount = 0;
 
         for (SearchResult result : searchResults) {
             String kind = result.getId().getKind();
-            SearchResultItem.SearchResultItemBuilder builder = SearchResultItem.builder()
-                    .kind(kind)
-                    .title(result.getSnippet().getTitle())
-                    .description(result.getSnippet().getDescription())
-                    .channelId(result.getSnippet().getChannelId())
-                    .channelTitle(result.getSnippet().getChannelTitle())
-                    .publishedAt(result.getSnippet().getPublishedAt() != null
-                            ? Instant.ofEpochMilli(result.getSnippet().getPublishedAt().getValue())
-                            : null)
-                    .thumbnailUrl(result.getSnippet().getThumbnails() != null &&
-                            result.getSnippet().getThumbnails().getDefault() != null
-                                    ? result.getSnippet().getThumbnails().getDefault().getUrl()
-                                    : null);
 
-            // Set resource-specific IDs and URLs
+            // Build the Id object
+            Id.IdBuilder idBuilder = Id.builder()
+                    .kind(kind);
+
+            String generatedUrl = null;
             switch (kind) {
                 case "youtube#video":
                     String videoId = result.getId().getVideoId();
-                    builder.videoId(videoId);
-                    builder.url("https://www.youtube.com/watch?v=" + videoId);
+                    idBuilder.videoId(videoId);
+                    generatedUrl = "https://www.youtube.com/watch?v=" + videoId;
                     videoCount++;
                     break;
                 case "youtube#channel":
-                    String channelIdRes = result.getId().getChannelId();
-                    builder.resourceChannelId(channelIdRes);
-                    builder.url("https://www.youtube.com/channel/" + channelIdRes);
+                    String channelId = result.getId().getChannelId();
+                    idBuilder.channelId(channelId);
+                    generatedUrl = "https://www.youtube.com/channel/" + channelId;
                     channelCount++;
                     break;
                 case "youtube#playlist":
                     String playlistId = result.getId().getPlaylistId();
-                    builder.playlistId(playlistId);
-                    builder.url("https://www.youtube.com/playlist?list=" + playlistId);
+                    idBuilder.playlistId(playlistId);
+                    generatedUrl = "https://www.youtube.com/playlist?list=" + playlistId;
                     playlistCount++;
                     break;
             }
 
-            items.add(builder.build());
+            // Build the Snippet object
+            Snippet snippet = Snippet.builder()
+                    .publishedAt(result.getSnippet().getPublishedAt() != null
+                            ? Instant.ofEpochMilli(result.getSnippet().getPublishedAt().getValue())
+                            : null)
+                    .channelId(result.getSnippet().getChannelId())
+                    .title(result.getSnippet().getTitle())
+                    .description(result.getSnippet().getDescription())
+                    .thumbnails(result.getSnippet().getThumbnails() != null
+                            ? buildThumbnails(result.getSnippet().getThumbnails())
+                            : null)
+                    .channelTitle(result.getSnippet().getChannelTitle())
+                    .liveBroadcastContent(result.getSnippet().getLiveBroadcastContent())
+                    .build();
+
+            // Build the Item
+            Item item = Item.builder()
+                    .kind(kind)
+                    .etag(result.getEtag())
+                    .id(idBuilder.build())
+                    .snippet(snippet)
+                    .url(generatedUrl)
+                    .build();
+
+            items.add(item);
+        }
+
+        // Build PageInfo
+        PageInfo pageInfo = null;
+        if (response.getPageInfo() != null) {
+            pageInfo = PageInfo.builder()
+                    .totalResults(response.getPageInfo().getTotalResults())
+                    .resultsPerPage(response.getPageInfo().getResultsPerPage())
+                    .build();
         }
 
         return Output.builder()
+                .kind("youtube#searchListResponse")
+                .etag(response.getEtag())
+                .nextPageToken(response.getNextPageToken())
+                .prevPageToken(response.getPrevPageToken())
+                .regionCode(response.getRegionCode())
+                .pageInfo(pageInfo)
                 .items(items)
-                .totalResults(items.size())
                 .videoCount(videoCount)
                 .channelCount(channelCount)
                 .playlistCount(playlistCount)
-                .nextPageToken(response.getNextPageToken())
-                .prevPageToken(response.getPrevPageToken())
-                .totalAvailable(response.getPageInfo() != null ? response.getPageInfo().getTotalResults() : null)
+                .build();
+    }
+
+    private Thumbnails buildThumbnails(com.google.api.services.youtube.model.ThumbnailDetails apiThumbnails) {
+        Thumbnails.ThumbnailsBuilder builder = Thumbnails.builder();
+
+        if (apiThumbnails.getDefault() != null) {
+            builder.defaultThumbnail(buildThumbnail(apiThumbnails.getDefault()));
+        }
+        if (apiThumbnails.getMedium() != null) {
+            builder.medium(buildThumbnail(apiThumbnails.getMedium()));
+        }
+        if (apiThumbnails.getHigh() != null) {
+            builder.high(buildThumbnail(apiThumbnails.getHigh()));
+        }
+        if (apiThumbnails.getStandard() != null) {
+            builder.standard(buildThumbnail(apiThumbnails.getStandard()));
+        }
+        if (apiThumbnails.getMaxres() != null) {
+            builder.maxres(buildThumbnail(apiThumbnails.getMaxres()));
+        }
+
+        return builder.build();
+    }
+
+    private Thumbnail buildThumbnail(com.google.api.services.youtube.model.Thumbnail apiThumbnail) {
+        return Thumbnail.builder()
+                .url(apiThumbnail.getUrl())
+                .width(apiThumbnail.getWidth() != null ? apiThumbnail.getWidth().intValue() : null)
+                .height(apiThumbnail.getHeight() != null ? apiThumbnail.getHeight().intValue() : null)
                 .build();
     }
 
@@ -537,65 +673,138 @@ public class Search extends AbstractYoutubeTask implements RunnableTask<Search.O
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
 
-        @Schema(title = "List of search results")
-        private final List<SearchResultItem> items;
+        @Schema(title = "Resource type", description = "Identifies the API resource's type (youtube#searchListResponse)")
+        private final String kind;
 
-        @Schema(title = "Number of results returned in this response")
-        private final Integer totalResults;
+        @Schema(title = "Etag", description = "The ETag for this resource")
+        private final String etag;
 
-        @Schema(title = "Number of videos in results")
-        private final Integer videoCount;
-
-        @Schema(title = "Number of channels in results")
-        private final Integer channelCount;
-
-        @Schema(title = "Number of playlists in results")
-        private final Integer playlistCount;
-
-        @Schema(title = "Token for the next page of results")
+        @Schema(title = "Next page token", description = "Token for the next page of results")
         private final String nextPageToken;
 
-        @Schema(title = "Token for the previous page of results")
+        @Schema(title = "Previous page token", description = "Token for the previous page of results")
         private final String prevPageToken;
 
-        @Schema(title = "Total number of results available matching the query (approximate)")
-        private final Integer totalAvailable;
+        @Schema(title = "Region code", description = "The region code that was used for the search query")
+        private final String regionCode;
+
+        @Schema(title = "Page information", description = "Paging information for the result set")
+        private final PageInfo pageInfo;
+
+        @Schema(title = "Search results", description = "List of search result items")
+        private final List<Item> items;
+
+        // Convenience fields (not in YouTube API)
+        @Schema(title = "Video count", description = "Number of videos in results (convenience field)")
+        private final Integer videoCount;
+
+        @Schema(title = "Channel count", description = "Number of channels in results (convenience field)")
+        private final Integer channelCount;
+
+        @Schema(title = "Playlist count", description = "Number of playlists in results (convenience field)")
+        private final Integer playlistCount;
     }
 
     @Builder
     @Getter
-    public static class SearchResultItem {
-        @Schema(title = "Resource kind (youtube#video, youtube#channel, or youtube#playlist)")
+    public static class PageInfo {
+        @Schema(title = "Total results", description = "Total number of results in the result set (approximate)")
+        private final Integer totalResults;
+
+        @Schema(title = "Results per page", description = "Number of results included in the API response")
+        private final Integer resultsPerPage;
+    }
+
+    @Builder
+    @Getter
+    public static class Item {
+        @Schema(title = "Resource kind", description = "Identifies the resource type (youtube#searchResult)")
         private final String kind;
 
-        @Schema(title = "Video ID (only for video results)")
+        @Schema(title = "Etag", description = "The ETag for this resource")
+        private final String etag;
+
+        @Schema(title = "Resource ID", description = "Information about the identified resource")
+        private final Id id;
+
+        @Schema(title = "Snippet", description = "Basic details about the search result")
+        private final Snippet snippet;
+
+        // Convenience field (not in YouTube API)
+        @Schema(title = "Direct URL", description = "Direct URL to the resource (convenience field)")
+        private final String url;
+    }
+
+    @Builder
+    @Getter
+    public static class Id {
+        @Schema(title = "Resource kind", description = "Type of the identified resource (youtube#video, youtube#channel, or youtube#playlist)")
+        private final String kind;
+
+        @Schema(title = "Video ID", description = "ID that YouTube uses to uniquely identify a video (only for video results)")
         private final String videoId;
 
-        @Schema(title = "Channel ID (only for channel results)")
-        private final String resourceChannelId;
-
-        @Schema(title = "Playlist ID (only for playlist results)")
-        private final String playlistId;
-
-        @Schema(title = "Result title")
-        private final String title;
-
-        @Schema(title = "Result description")
-        private final String description;
-
-        @Schema(title = "Channel ID that published this resource")
+        @Schema(title = "Channel ID", description = "ID that YouTube uses to uniquely identify a channel (only for channel results)")
         private final String channelId;
 
-        @Schema(title = "Channel title that published this resource")
-        private final String channelTitle;
+        @Schema(title = "Playlist ID", description = "ID that YouTube uses to uniquely identify a playlist (only for playlist results)")
+        private final String playlistId;
+    }
 
-        @Schema(title = "Publication date")
+    @Builder
+    @Getter
+    public static class Snippet {
+        @Schema(title = "Published at", description = "Date and time that the resource was created")
         private final Instant publishedAt;
 
-        @Schema(title = "Thumbnail URL")
-        private final String thumbnailUrl;
+        @Schema(title = "Channel ID", description = "ID of the channel that published the resource")
+        private final String channelId;
 
-        @Schema(title = "Direct URL to the resource")
+        @Schema(title = "Title", description = "Title of the search result")
+        private final String title;
+
+        @Schema(title = "Description", description = "Description of the search result")
+        private final String description;
+
+        @Schema(title = "Thumbnails", description = "Map of thumbnail images for the result")
+        private final Thumbnails thumbnails;
+
+        @Schema(title = "Channel title", description = "Title of the channel that published the resource")
+        private final String channelTitle;
+
+        @Schema(title = "Live broadcast content", description = "Indicates if the resource is live content (none, upcoming, live, completed)")
+        private final String liveBroadcastContent;
+    }
+
+    @Builder
+    @Getter
+    public static class Thumbnails {
+        @Schema(title = "Default thumbnail", description = "Default thumbnail (120x90 pixels)")
+        private final Thumbnail defaultThumbnail;
+
+        @Schema(title = "Medium thumbnail", description = "Medium resolution thumbnail (320x180 pixels)")
+        private final Thumbnail medium;
+
+        @Schema(title = "High thumbnail", description = "High resolution thumbnail (480x360 pixels)")
+        private final Thumbnail high;
+
+        @Schema(title = "Standard thumbnail", description = "Standard resolution thumbnail (640x480 pixels)")
+        private final Thumbnail standard;
+
+        @Schema(title = "Maxres thumbnail", description = "Maximum resolution thumbnail (1280x720 pixels)")
+        private final Thumbnail maxres;
+    }
+
+    @Builder
+    @Getter
+    public static class Thumbnail {
+        @Schema(title = "URL", description = "Image URL")
         private final String url;
+
+        @Schema(title = "Width", description = "Image width in pixels")
+        private final Integer width;
+
+        @Schema(title = "Height", description = "Image height in pixels")
+        private final Integer height;
     }
 }

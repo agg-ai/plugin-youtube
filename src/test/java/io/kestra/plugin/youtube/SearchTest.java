@@ -100,33 +100,35 @@ class SearchTest {
                 // Then
                 assertNotNull(output);
                 assertThat(output.getItems(), hasSize(3));
-                assertThat(output.getTotalResults(), is(3));
+                assertNotNull(output.getPageInfo());
+                assertThat(output.getPageInfo().getResultsPerPage(), is(3));
                 assertThat(output.getVideoCount(), is(1));
                 assertThat(output.getChannelCount(), is(1));
                 assertThat(output.getPlaylistCount(), is(1));
 
                 // Verify video result
-                Search.SearchResultItem videoItem = output.getItems().stream()
+                Search.Item videoItem = output.getItems().stream()
                                 .filter(item -> "youtube#video".equals(item.getKind()))
                                 .findFirst().orElse(null);
                 assertNotNull(videoItem);
-                assertThat(videoItem.getVideoId(), is("vid1"));
+                assertThat(videoItem.getId().getVideoId(), is("vid1"));
                 assertThat(videoItem.getUrl(), is("https://www.youtube.com/watch?v=vid1"));
+                assertThat(videoItem.getSnippet().getTitle(), is("Video Title"));
 
                 // Verify channel result
-                Search.SearchResultItem channelItem = output.getItems().stream()
+                Search.Item channelItem = output.getItems().stream()
                                 .filter(item -> "youtube#channel".equals(item.getKind()))
                                 .findFirst().orElse(null);
                 assertNotNull(channelItem);
-                assertThat(channelItem.getResourceChannelId(), is("chan1"));
+                assertThat(channelItem.getId().getChannelId(), is("chan1"));
                 assertThat(channelItem.getUrl(), is("https://www.youtube.com/channel/chan1"));
 
                 // Verify playlist result
-                Search.SearchResultItem playlistItem = output.getItems().stream()
+                Search.Item playlistItem = output.getItems().stream()
                                 .filter(item -> "youtube#playlist".equals(item.getKind()))
                                 .findFirst().orElse(null);
                 assertNotNull(playlistItem);
-                assertThat(playlistItem.getPlaylistId(), is("playlist1"));
+                assertThat(playlistItem.getId().getPlaylistId(), is("playlist1"));
                 assertThat(playlistItem.getUrl(), is("https://www.youtube.com/playlist?list=playlist1"));
         }
 
@@ -339,7 +341,7 @@ class SearchTest {
                 verify(mockSearchList).setPageToken(pageToken);
                 assertThat(output.getNextPageToken(), is(nextToken));
                 assertThat(output.getPrevPageToken(), is("PREV_TOKEN"));
-                assertThat(output.getTotalAvailable(), is(100));
+                assertThat(output.getPageInfo().getTotalResults(), is(100));
         }
 
         @Test
@@ -364,7 +366,7 @@ class SearchTest {
                 // Then
                 assertNotNull(output);
                 assertThat(output.getItems(), hasSize(0));
-                assertThat(output.getTotalResults(), is(0));
+                assertThat(output.getPageInfo().getTotalResults(), is(0));
                 assertThat(output.getVideoCount(), is(0));
                 assertThat(output.getChannelCount(), is(0));
                 assertThat(output.getPlaylistCount(), is(0));
@@ -484,6 +486,7 @@ class SearchTest {
         private PageInfo createPageInfo(int totalResults) {
                 PageInfo pageInfo = new PageInfo();
                 pageInfo.setTotalResults(totalResults);
+                pageInfo.setResultsPerPage(totalResults);
                 return pageInfo;
         }
 }
