@@ -6,6 +6,7 @@ import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
+import io.kestra.plugin.youtube.models.*;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
@@ -95,7 +96,7 @@ class SearchTest {
                 doReturn(mockYouTube).when(spyTask).createYoutubeService(any(RunContext.class));
 
                 // When
-                Search.Output output = spyTask.run(runContext);
+                SearchOutput output = spyTask.run(runContext);
 
                 // Then
                 assertNotNull(output);
@@ -107,7 +108,7 @@ class SearchTest {
                 assertThat(output.getPlaylistCount(), is(1));
 
                 // Verify video result
-                Search.Item videoItem = output.getItems().stream()
+                SearchItem videoItem = output.getItems().stream()
                                 .filter(item -> "youtube#video".equals(item.getKind()))
                                 .findFirst().orElse(null);
                 assertNotNull(videoItem);
@@ -116,7 +117,7 @@ class SearchTest {
                 assertThat(videoItem.getSnippet().getTitle(), is("Video Title"));
 
                 // Verify channel result
-                Search.Item channelItem = output.getItems().stream()
+                SearchItem channelItem = output.getItems().stream()
                                 .filter(item -> "youtube#channel".equals(item.getKind()))
                                 .findFirst().orElse(null);
                 assertNotNull(channelItem);
@@ -124,7 +125,7 @@ class SearchTest {
                 assertThat(channelItem.getUrl(), is("https://www.youtube.com/channel/chan1"));
 
                 // Verify playlist result
-                Search.Item playlistItem = output.getItems().stream()
+                SearchItem playlistItem = output.getItems().stream()
                                 .filter(item -> "youtube#playlist".equals(item.getKind()))
                                 .findFirst().orElse(null);
                 assertNotNull(playlistItem);
@@ -146,14 +147,14 @@ class SearchTest {
                 Search task = Search.builder()
                                 .accessToken(Property.ofValue("test_access_token"))
                                 .query(Property.ofValue("tutorials"))
-                                .resourceType(Property.ofValue(List.of(Search.ResourceType.VIDEO)))
+                                .resourceType(Property.ofValue(List.of(ResourceType.VIDEO)))
                                 .build();
 
                 Search spyTask = spy(task);
                 doReturn(mockYouTube).when(spyTask).createYoutubeService(any(RunContext.class));
 
                 // When
-                Search.Output output = spyTask.run(runContext);
+                SearchOutput output = spyTask.run(runContext);
 
                 // Then
                 assertNotNull(output);
@@ -179,14 +180,14 @@ class SearchTest {
                 Search task = Search.builder()
                                 .accessToken(Property.ofValue("test_access_token"))
                                 .query(Property.ofValue("technology"))
-                                .resourceType(Property.ofValue(List.of(Search.ResourceType.CHANNEL)))
+                                .resourceType(Property.ofValue(List.of(ResourceType.CHANNEL)))
                                 .build();
 
                 Search spyTask = spy(task);
                 doReturn(mockYouTube).when(spyTask).createYoutubeService(any(RunContext.class));
 
                 // When
-                Search.Output output = spyTask.run(runContext);
+                SearchOutput output = spyTask.run(runContext);
 
                 // Then
                 assertNotNull(output);
@@ -212,14 +213,14 @@ class SearchTest {
                 Search task = Search.builder()
                                 .accessToken(Property.ofValue("test_access_token"))
                                 .query(Property.ofValue("workout"))
-                                .resourceType(Property.ofValue(List.of(Search.ResourceType.PLAYLIST)))
+                                .resourceType(Property.ofValue(List.of(ResourceType.PLAYLIST)))
                                 .build();
 
                 Search spyTask = spy(task);
                 doReturn(mockYouTube).when(spyTask).createYoutubeService(any(RunContext.class));
 
                 // When
-                Search.Output output = spyTask.run(runContext);
+                SearchOutput output = spyTask.run(runContext);
 
                 // Then
                 assertNotNull(output);
@@ -260,7 +261,7 @@ class SearchTest {
                 doReturn(mockYouTube).when(spyTask).createYoutubeService(any(RunContext.class));
 
                 // When
-                Search.Output output = spyTask.run(runContext);
+                SearchOutput output = spyTask.run(runContext);
 
                 // Then
                 assertNotNull(output);
@@ -282,12 +283,12 @@ class SearchTest {
 
                 Search task = Search.builder()
                                 .accessToken(Property.ofValue("test_access_token"))
-                                .resourceType(Property.ofValue(List.of(Search.ResourceType.VIDEO)))
-                                .videoDuration(Property.ofValue(Search.VideoDuration.MEDIUM))
-                                .videoDefinition(Property.ofValue(Search.VideoDefinition.HIGH))
-                                .videoDimension(Property.ofValue(Search.VideoDimension.TWO_D))
-                                .videoLicense(Property.ofValue(Search.VideoLicense.CREATIVE_COMMON))
-                                .videoCaption(Property.ofValue(Search.VideoCaption.CLOSED_CAPTION))
+                                .resourceType(Property.ofValue(List.of(ResourceType.VIDEO)))
+                                .videoDuration(Property.ofValue(VideoDuration.MEDIUM))
+                                .videoDefinition(Property.ofValue(VideoDefinition.HIGH))
+                                .videoDimension(Property.ofValue(VideoDimension.TWO_D))
+                                .videoLicense(Property.ofValue(VideoLicense.CREATIVE_COMMON))
+                                .videoCaption(Property.ofValue(VideoCaption.CLOSED_CAPTION))
                                 .videoCategoryId(Property.ofValue("28"))
                                 .build();
 
@@ -295,7 +296,7 @@ class SearchTest {
                 doReturn(mockYouTube).when(spyTask).createYoutubeService(any(RunContext.class));
 
                 // When
-                Search.Output output = spyTask.run(runContext);
+                SearchOutput output = spyTask.run(runContext);
 
                 // Then
                 assertNotNull(output);
@@ -323,7 +324,7 @@ class SearchTest {
                 Search task = Search.builder()
                                 .accessToken(Property.ofValue("test_access_token"))
                                 .query(Property.ofValue("test"))
-                                .order(Property.ofValue(Search.Order.VIEW_COUNT))
+                                .order(Property.ofValue(Order.VIEW_COUNT))
                                 .maxResults(Property.ofValue(50))
                                 .pageToken(Property.ofValue(pageToken))
                                 .build();
@@ -332,7 +333,7 @@ class SearchTest {
                 doReturn(mockYouTube).when(spyTask).createYoutubeService(any(RunContext.class));
 
                 // When
-                Search.Output output = spyTask.run(runContext);
+                SearchOutput output = spyTask.run(runContext);
 
                 // Then
                 assertNotNull(output);
@@ -361,7 +362,7 @@ class SearchTest {
                 doReturn(mockYouTube).when(spyTask).createYoutubeService(any(RunContext.class));
 
                 // When
-                Search.Output output = spyTask.run(runContext);
+                SearchOutput output = spyTask.run(runContext);
 
                 // Then
                 assertNotNull(output);
@@ -387,14 +388,14 @@ class SearchTest {
                                 .accessToken(Property.ofValue("test_access_token"))
                                 .query(Property.ofValue("test"))
                                 .resourceType(Property.ofValue(
-                                                List.of(Search.ResourceType.VIDEO, Search.ResourceType.CHANNEL)))
+                                                List.of(ResourceType.VIDEO, ResourceType.CHANNEL)))
                                 .build();
 
                 Search spyTask = spy(task);
                 doReturn(mockYouTube).when(spyTask).createYoutubeService(any(RunContext.class));
 
                 // When
-                Search.Output output = spyTask.run(runContext);
+                SearchOutput output = spyTask.run(runContext);
 
                 // Then
                 assertNotNull(output);
@@ -421,12 +422,56 @@ class SearchTest {
                 doReturn(mockYouTube).when(spyTask).createYoutubeService(any(RunContext.class));
 
                 // When
-                Search.Output output = spyTask.run(runContext);
+                SearchOutput output = spyTask.run(runContext);
 
                 // Then
                 assertNotNull(output);
                 verify(mockSearchList).setMaxResults(25L);
                 verify(mockSearchList).setOrder("relevance");
+        }
+
+        @Test
+        void shouldEnforceForMineRules() throws Exception {
+                // Given - forMine=true with restricted parameters that should be ignored
+                SearchListResponse mockResponse = new SearchListResponse();
+                List<SearchResult> results = List.of(
+                                createVideoResult("vid1", "My Video", "My Description"));
+                mockResponse.setItems(results);
+                mockResponse.setPageInfo(createPageInfo(1));
+                when(mockSearchList.execute()).thenReturn(mockResponse);
+
+                Search task = Search.builder()
+                                .accessToken(Property.ofValue("test_access_token"))
+                                .query(Property.ofValue("test query"))
+                                .forMine(Property.ofValue(true))
+                                // These should be ignored when forMine=true
+                                .videoDuration(Property.ofValue(VideoDuration.LONG))
+                                .videoDefinition(Property.ofValue(VideoDefinition.HIGH))
+                                .videoDimension(Property.ofValue(VideoDimension.TWO_D))
+                                .videoLicense(Property.ofValue(VideoLicense.YOUTUBE))
+                                .videoEmbeddable(Property.ofValue(VideoEmbeddable.TRUE))
+                                .build();
+
+                Search spyTask = spy(task);
+                doReturn(mockYouTube).when(spyTask).createYoutubeService(any(RunContext.class));
+
+                // When
+                SearchOutput output = spyTask.run(runContext);
+
+                // Then
+                assertNotNull(output);
+                verify(mockSearchList).setForMine(true);
+                // Verify type is forced to "video"
+                verify(mockSearchList).setType(Collections.singletonList("video"));
+                // Verify restricted parameters are NOT set
+                verify(mockSearchList, never()).setVideoDuration(any());
+                verify(mockSearchList, never()).setVideoDefinition(any());
+                verify(mockSearchList, never()).setVideoDimension(any());
+                verify(mockSearchList, never()).setVideoLicense(any());
+                verify(mockSearchList, never()).setVideoEmbeddable(any());
+                verify(mockSearchList, never()).setVideoPaidProductPlacement(any());
+                verify(mockSearchList, never()).setVideoSyndicated(any());
+                verify(mockSearchList, never()).setVideoType(any());
         }
 
         // Helper methods
@@ -466,8 +511,9 @@ class SearchTest {
                 return result;
         }
 
-        private SearchResultSnippet createSnippet(String title, String description) {
-                SearchResultSnippet snippet = new SearchResultSnippet();
+        private com.google.api.services.youtube.model.SearchResultSnippet createSnippet(String title,
+                        String description) {
+                com.google.api.services.youtube.model.SearchResultSnippet snippet = new com.google.api.services.youtube.model.SearchResultSnippet();
                 snippet.setTitle(title);
                 snippet.setDescription(description);
                 snippet.setChannelId("UC_test_channel");
@@ -475,7 +521,7 @@ class SearchTest {
                 snippet.setPublishedAt(new com.google.api.client.util.DateTime(System.currentTimeMillis()));
 
                 ThumbnailDetails thumbnails = new ThumbnailDetails();
-                Thumbnail defaultThumbnail = new Thumbnail();
+                com.google.api.services.youtube.model.Thumbnail defaultThumbnail = new com.google.api.services.youtube.model.Thumbnail();
                 defaultThumbnail.setUrl("https://i.ytimg.com/vi/test/default.jpg");
                 thumbnails.setDefault(defaultThumbnail);
                 snippet.setThumbnails(thumbnails);
@@ -483,8 +529,8 @@ class SearchTest {
                 return snippet;
         }
 
-        private PageInfo createPageInfo(int totalResults) {
-                PageInfo pageInfo = new PageInfo();
+        private com.google.api.services.youtube.model.PageInfo createPageInfo(int totalResults) {
+                com.google.api.services.youtube.model.PageInfo pageInfo = new com.google.api.services.youtube.model.PageInfo();
                 pageInfo.setTotalResults(totalResults);
                 pageInfo.setResultsPerPage(totalResults);
                 return pageInfo;
