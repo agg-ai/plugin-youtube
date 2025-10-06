@@ -346,8 +346,7 @@ public class Search extends AbstractYoutubeTask implements RunnableTask<SearchOu
             String kind = result.getId().getKind();
 
             // Build the Id object
-            SearchResultId.SearchResultIdBuilder idBuilder = SearchResultId.builder()
-                    .kind(kind);
+            SearchResultId.SearchResultIdBuilder idBuilder = SearchResultId.builder().kind(kind);
 
             String generatedUrl = null;
             switch (kind) {
