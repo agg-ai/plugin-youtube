@@ -9,6 +9,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.youtube.helpers.EnumHelper;
+import io.kestra.plugin.youtube.helpers.PropertyHelper;
 import io.kestra.plugin.youtube.models.*;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -43,9 +44,9 @@ import java.util.stream.Collectors;
                     accessToken: "{{ outputs.authenticate.accessToken }}"
                     query: "machine learning tutorial"
                     resourceType:
-                      - VIDEO
+                      - video
                     maxResults: 25
-                    order: RELEVANCE
+                    order: relevance
                 """),
         @Example(title = "Search all resource types (videos, channels, playlists)", code = """
                   - id: search_all
@@ -53,7 +54,7 @@ import java.util.stream.Collectors;
                     accessToken: "{{ secret('YOUTUBE_ACCESS_TOKEN') }}"
                     query: "cooking recipes"
                     maxResults: 50
-                    order: VIEW_COUNT
+                    order: viewcount
                 """),
         @Example(title = "Search videos in a specific channel with filters", code = """
                   - id: search_channel_videos
@@ -61,11 +62,11 @@ import java.util.stream.Collectors;
                     accessToken: "{{ secret('YOUTUBE_ACCESS_TOKEN') }}"
                     channelId: "UCxxxxxxxxxxxxxx"
                     resourceType:
-                      - VIDEO
-                    videoDuration: MEDIUM
-                    videoDefinition: HIGH
+                      - video
+                    videoDuration: medium
+                    videoDefinition: high
                     publishedAfter: "2024-01-01T00:00:00Z"
-                    order: DATE
+                    order: date
                 """),
         @Example(title = "Search for channels by topic", code = """
                   - id: search_channels
@@ -73,7 +74,7 @@ import java.util.stream.Collectors;
                     accessToken: "{{ secret('YOUTUBE_ACCESS_TOKEN') }}"
                     query: "technology news"
                     resourceType:
-                      - CHANNEL
+                      - channel
                     maxResults: 20
                 """),
         @Example(title = "Search for playlists", code = """
@@ -82,11 +83,14 @@ import java.util.stream.Collectors;
                     accessToken: "{{ secret('YOUTUBE_ACCESS_TOKEN') }}"
                     query: "workout routines"
                     resourceType:
-                      - PLAYLIST
+                      - playlist
                     maxResults: 30
                 """)
 })
 public class Search extends AbstractYoutubeTask implements RunnableTask<SearchOutput> {
+
+    @Schema(title = "For mine", description = "Return results for the authenticated user's channel only. Requires resourceType=video or resourceType=channel.")
+    private Property<Boolean> forMine;
 
     @Schema(title = "Search query", description = "The search query term to search for. You can also use Boolean NOT (-) and OR (|) operators.")
     private Property<String> query;
@@ -101,9 +105,11 @@ public class Search extends AbstractYoutubeTask implements RunnableTask<SearchOu
     @Builder.Default
     private Property<Integer> maxResults = Property.ofValue(25);
 
-    @Schema(title = "Order", description = "Sort order for search results")
+    @Schema(title = "Order", description = "The order parameter specifies the method that will be used to order resources in the API response. The default value is relevance.", allowableValues = {
+            "date", "rating",
+            "relevance", "title", "videoCount", "viewCount" })
     @Builder.Default
-    private Property<Order> order = Property.ofValue(Order.RELEVANCE);
+    private Property<String> order = Property.ofValue("relevance");
 
     @Schema(title = "Published after", description = "Return only resources created after this date (RFC 3339 format: YYYY-MM-DDTHH:MM:SSZ)")
     private Property<String> publishedAfter;
@@ -117,50 +123,59 @@ public class Search extends AbstractYoutubeTask implements RunnableTask<SearchOu
     @Schema(title = "Relevance language", description = "Return results most relevant to this language (ISO 639-1 two-letter language code)")
     private Property<String> relevanceLanguage;
 
-    @Schema(title = "Safe search", description = "Filter results based on their age-appropriateness")
-    private Property<SafeSearch> safeSearch;
+    @Schema(title = "Safe search", description = "Filter results based on their age-appropriateness", allowableValues = {
+            "moderate", "none", "strict" })
+    private Property<String> safeSearch;
 
     @Schema(title = "Topic ID", description = "Filter on videos associated with a particular topic (Freebase topic ID)")
     private Property<String> topicId;
 
-    @Schema(title = "Video caption", description = "Filter on videos based on caption availability. Requires resourceType=VIDEO.")
-    private Property<VideoCaption> videoCaption;
+    @Schema(title = "Video caption", description = "Filter on videos based on caption availability. Requires resourceType=video.", allowableValues = {
+            "any", "closedCaption", "none" })
+    private Property<String> videoCaption;
 
-    @Schema(title = "Video category ID", description = "Filter on videos in a specific category. Requires resourceType=VIDEO.")
+    @Schema(title = "Video category ID", description = "Filter on videos in a specific category. Requires resourceType=video.")
     private Property<String> videoCategoryId;
 
-    @Schema(title = "Video definition", description = "Filter by video quality. Requires resourceType=VIDEO.")
-    private Property<VideoDefinition> videoDefinition;
+    @Schema(title = "Video definition", description = "Filter by video quality. Requires resourceType=video.", allowableValues = {
+            "any", "high", "standard" })
+    private Property<String> videoDefinition;
 
-    @Schema(title = "Video dimension", description = "Filter on 2D or 3D videos. Requires resourceType=VIDEO.")
-    private Property<VideoDimension> videoDimension;
+    @Schema(title = "Video dimension", description = "Filter on 2D or 3D videos. Requires resourceType=video.", allowableValues = {
+            "2d", "3d", "any" })
+    private Property<String> videoDimension;
 
-    @Schema(title = "Video duration", description = "Filter by video length. Requires resourceType=VIDEO.")
-    private Property<VideoDuration> videoDuration;
+    @Schema(title = "Video duration", description = "Filter by video length. Requires resourceType=video.", allowableValues = {
+            "any", "long", "medium", "short" })
+    private Property<String> videoDuration;
 
-    @Schema(title = "Video embeddable", description = "Filter on embeddable videos only. Requires resourceType=VIDEO.")
-    private Property<VideoEmbeddable> videoEmbeddable;
+    @Schema(title = "Video embeddable", description = "Filter on embeddable videos only. Requires resourceType=video.", allowableValues = {
+            "any", "true" })
+    private Property<String> videoEmbeddable;
 
-    @Schema(title = "Video license", description = "Filter by license type. Requires resourceType=VIDEO.")
-    private Property<VideoLicense> videoLicense;
+    @Schema(title = "Video license", description = "Filter by license type. Requires resourceType=video.", allowableValues = {
+            "any", "creativeCommon", "youtube" })
+    private Property<String> videoLicense;
 
-    @Schema(title = "Video paid product placement", description = "Filter on videos with paid product placement. Requires resourceType=VIDEO.")
-    private Property<VideoPaidProductPlacement> videoPaidProductPlacement;
+    @Schema(title = "Video paid product placement", description = "Filter on videos with paid product placement. Requires resourceType=video.", allowableValues = {
+            "any", "true" })
+    private Property<String> videoPaidProductPlacement;
 
-    @Schema(title = "Video syndicated", description = "Filter on syndicated videos. Requires resourceType=VIDEO.")
-    private Property<VideoSyndicated> videoSyndicated;
+    @Schema(title = "Video syndicated", description = "Filter on syndicated videos. Requires resourceType=video.", allowableValues = {
+            "any", "true" })
+    private Property<String> videoSyndicated;
 
-    @Schema(title = "Video type", description = "Filter by video type. Requires resourceType=VIDEO.")
-    private Property<VideoType> videoType;
+    @Schema(title = "Video type", description = "Filter by video type. Requires resourceType=video.", allowableValues = {
+            "any", "episode", "movie" })
+    private Property<String> videoType;
 
-    @Schema(title = "Event type", description = "Filter on broadcasts. Requires resourceType=VIDEO.")
-    private Property<EventType> eventType;
+    @Schema(title = "Event type", description = "Filter on broadcasts. Requires resourceType=video.", allowableValues = {
+            "completed", "live", "upcoming" })
+    private Property<String> eventType;
 
-    @Schema(title = "Channel type", description = "Filter on channel type. Requires resourceType=CHANNEL.")
-    private Property<ChannelType> channelType;
-
-    @Schema(title = "For mine", description = "Return results for the authenticated user's channel only. Requires resourceType=VIDEO or resourceType=CHANNEL.")
-    private Property<Boolean> forMine;
+    @Schema(title = "Channel type", description = "Filter on channel type. Requires resourceType=channel.", allowableValues = {
+            "any", "show" })
+    private Property<String> channelType;
 
     @Schema(title = "Page token", description = "Token for pagination to retrieve the next page of results")
     private Property<String> pageToken;
@@ -169,67 +184,47 @@ public class Search extends AbstractYoutubeTask implements RunnableTask<SearchOu
     public SearchOutput run(RunContext runContext) throws Exception {
         YouTube youtube = createYoutubeService(runContext);
 
-        // Render all parameters with safe enum parsing
-        String renderedQuery = this.query != null ? runContext.render(this.query).as(String.class).orElse(null) : null;
+        // Render all parameters
+        String renderedQuery = PropertyHelper.safeRender(runContext, this.query, null, String.class);
         List<ResourceType> renderedTypes = EnumHelper.safeRenderEnumList(runContext, this.resourceType,
                 ResourceType.class);
-        String renderedChannelId = this.channelId != null
-                ? runContext.render(this.channelId).as(String.class).orElse(null)
-                : null;
-        Integer renderedMaxResults = runContext.render(this.maxResults).as(Integer.class).orElse(25);
-        Order renderedOrder = EnumHelper.safeRenderEnum(runContext, this.order, Order.class);
-        if (renderedOrder == null) {
-            renderedOrder = Order.RELEVANCE;
-        }
-        String renderedPublishedAfter = this.publishedAfter != null
-                ? runContext.render(this.publishedAfter).as(String.class).orElse(null)
-                : null;
-        String renderedPublishedBefore = this.publishedBefore != null
-                ? runContext.render(this.publishedBefore).as(String.class).orElse(null)
-                : null;
-        String renderedRegionCode = this.regionCode != null
-                ? runContext.render(this.regionCode).as(String.class).orElse(null)
-                : null;
-        String renderedRelevanceLanguage = this.relevanceLanguage != null
-                ? runContext.render(this.relevanceLanguage).as(String.class).orElse(null)
-                : null;
-        SafeSearch renderedSafeSearch = EnumHelper.safeRenderEnum(runContext, this.safeSearch, SafeSearch.class);
-        String renderedTopicId = this.topicId != null ? runContext.render(this.topicId).as(String.class).orElse(null)
-                : null;
-        VideoCaption renderedVideoCaption = EnumHelper.safeRenderEnum(runContext, this.videoCaption,
-                VideoCaption.class);
-        String renderedVideoCategoryId = this.videoCategoryId != null
-                ? runContext.render(this.videoCategoryId).as(String.class).orElse(null)
-                : null;
-        VideoDefinition renderedVideoDefinition = EnumHelper.safeRenderEnum(runContext, this.videoDefinition,
-                VideoDefinition.class);
-        VideoDimension renderedVideoDimension = EnumHelper.safeRenderEnum(runContext, this.videoDimension,
-                VideoDimension.class);
-        VideoDuration renderedVideoDuration = EnumHelper.safeRenderEnum(runContext, this.videoDuration,
-                VideoDuration.class);
-        VideoEmbeddable renderedVideoEmbeddable = EnumHelper.safeRenderEnum(runContext, this.videoEmbeddable,
-                VideoEmbeddable.class);
-        VideoLicense renderedVideoLicense = EnumHelper.safeRenderEnum(runContext, this.videoLicense,
-                VideoLicense.class);
-        VideoPaidProductPlacement renderedVideoPaidProductPlacement = EnumHelper.safeRenderEnum(runContext,
-                this.videoPaidProductPlacement, VideoPaidProductPlacement.class);
-        VideoSyndicated renderedVideoSyndicated = EnumHelper.safeRenderEnum(runContext, this.videoSyndicated,
-                VideoSyndicated.class);
-        VideoType renderedVideoType = EnumHelper.safeRenderEnum(runContext, this.videoType, VideoType.class);
-        EventType renderedEventType = EnumHelper.safeRenderEnum(runContext, this.eventType, EventType.class);
-        ChannelType renderedChannelType = EnumHelper.safeRenderEnum(runContext, this.channelType, ChannelType.class);
-        Boolean renderedForMine = this.forMine != null ? runContext.render(this.forMine).as(Boolean.class).orElse(null)
-                : null;
-        String renderedPageToken = this.pageToken != null
-                ? runContext.render(this.pageToken).as(String.class).orElse(null)
-                : null;
+        String renderedChannelId = PropertyHelper.safeRender(runContext, this.channelId, null, String.class);
+        Integer renderedMaxResults = PropertyHelper.safeRender(runContext, this.maxResults, 25, Integer.class);
+        String renderedOrder = PropertyHelper.safeRender(runContext, this.order, "relevance", String.class);
+        String renderedPublishedAfter = PropertyHelper.safeRender(runContext, this.publishedAfter, null, String.class);
+        String renderedPublishedBefore = PropertyHelper.safeRender(runContext, this.publishedBefore, null,
+                String.class);
+        String renderedRegionCode = PropertyHelper.safeRender(runContext, this.regionCode, null, String.class);
+        String renderedRelevanceLanguage = PropertyHelper.safeRender(runContext, this.relevanceLanguage, null,
+                String.class);
+        String renderedSafeSearch = PropertyHelper.safeRender(runContext, this.safeSearch, null, String.class);
+        String renderedTopicId = PropertyHelper.safeRender(runContext, this.topicId, null, String.class);
+        String renderedVideoCaption = PropertyHelper.safeRender(runContext, this.videoCaption, null, String.class);
+        String renderedVideoCategoryId = PropertyHelper.safeRender(runContext, this.videoCategoryId, null,
+                String.class);
+        String renderedVideoDefinition = PropertyHelper.safeRender(runContext, this.videoDefinition, null,
+                String.class);
+        String renderedVideoDimension = PropertyHelper.safeRender(runContext, this.videoDimension, null, String.class);
+        String renderedVideoDuration = PropertyHelper.safeRender(runContext, this.videoDuration, null, String.class);
+        String renderedVideoEmbeddable = PropertyHelper.safeRender(runContext, this.videoEmbeddable, null,
+                String.class);
+        String renderedVideoLicense = PropertyHelper.safeRender(runContext, this.videoLicense, null, String.class);
+        String renderedVideoPaidProductPlacement = PropertyHelper.safeRender(runContext, this.videoPaidProductPlacement,
+                null, String.class);
+        String renderedVideoSyndicated = PropertyHelper.safeRender(runContext, this.videoSyndicated, null,
+                String.class);
+        String renderedVideoType = PropertyHelper.safeRender(runContext, this.videoType, null, String.class);
+        String renderedEventType = PropertyHelper.safeRender(runContext, this.eventType, null, String.class);
+        String renderedChannelType = PropertyHelper.safeRender(runContext, this.channelType, null, String.class);
+        Boolean renderedForMine = PropertyHelper.safeRender(runContext, this.forMine, false, Boolean.class);
+        String renderedPageToken = PropertyHelper.safeRender(runContext, this.pageToken, null, String.class);
 
         // Enforce YouTube API rules for forMine parameter
         // When forMine=true, type must be "video" and certain video filters cannot be
         // set
         if (renderedForMine != null && renderedForMine) {
-            // Force resource type to VIDEO only
-            renderedTypes = Collections.singletonList(ResourceType.VIDEO);
+            // Force resource type to video only
+            renderedTypes = Collections.singletonList(ResourceType.video);
 
             // Clear restricted parameters that cannot be used with forMine=true
             renderedVideoDefinition = null;
@@ -242,11 +237,14 @@ public class Search extends AbstractYoutubeTask implements RunnableTask<SearchOu
             renderedVideoType = null;
         }
 
+        renderedOrder = renderedOrder.isEmpty() ? "relevance" : renderedOrder;
+        renderedMaxResults = renderedMaxResults == 0 ? 25 : renderedMaxResults;
+
         // Build the search request
         YouTube.Search.List request = youtube.search()
                 .list(Collections.singletonList("snippet"))
                 .setMaxResults(Long.valueOf(renderedMaxResults))
-                .setOrder(renderedOrder.toApiValue());
+                .setOrder(renderedOrder);
 
         // Set resource types (if not specified, API searches all types by default)
         if (renderedTypes != null && !renderedTypes.isEmpty()) {
@@ -275,51 +273,51 @@ public class Search extends AbstractYoutubeTask implements RunnableTask<SearchOu
         if (renderedRelevanceLanguage != null && !renderedRelevanceLanguage.isEmpty()) {
             request.setRelevanceLanguage(renderedRelevanceLanguage);
         }
-        if (renderedSafeSearch != null) {
-            request.setSafeSearch(renderedSafeSearch.toApiValue());
+        if (renderedSafeSearch != null && !renderedSafeSearch.isEmpty()) {
+            request.setSafeSearch(renderedSafeSearch);
         }
         if (renderedTopicId != null && !renderedTopicId.isEmpty()) {
             request.setTopicId(renderedTopicId);
         }
 
         // Video-specific filters
-        if (renderedVideoCaption != null) {
-            request.setVideoCaption(renderedVideoCaption.toApiValue());
+        if (renderedVideoCaption != null && !renderedVideoCaption.isEmpty()) {
+            request.setVideoCaption(renderedVideoCaption);
         }
         if (renderedVideoCategoryId != null && !renderedVideoCategoryId.isEmpty()) {
             request.setVideoCategoryId(renderedVideoCategoryId);
         }
-        if (renderedVideoDefinition != null) {
-            request.setVideoDefinition(renderedVideoDefinition.toApiValue());
+        if (renderedVideoDefinition != null && !renderedVideoDefinition.isEmpty()) {
+            request.setVideoDefinition(renderedVideoDefinition);
         }
-        if (renderedVideoDimension != null) {
-            request.setVideoDimension(renderedVideoDimension.toApiValue());
+        if (renderedVideoDimension != null && !renderedVideoDimension.isEmpty()) {
+            request.setVideoDimension(renderedVideoDimension);
         }
-        if (renderedVideoDuration != null) {
-            request.setVideoDuration(renderedVideoDuration.toApiValue());
+        if (renderedVideoDuration != null && !renderedVideoDuration.isEmpty()) {
+            request.setVideoDuration(renderedVideoDuration);
         }
-        if (renderedVideoEmbeddable != null) {
-            request.setVideoEmbeddable(renderedVideoEmbeddable.toApiValue());
+        if (renderedVideoEmbeddable != null && !renderedVideoEmbeddable.isEmpty()) {
+            request.setVideoEmbeddable(renderedVideoEmbeddable);
         }
-        if (renderedVideoLicense != null) {
-            request.setVideoLicense(renderedVideoLicense.toApiValue());
+        if (renderedVideoLicense != null && !renderedVideoLicense.isEmpty()) {
+            request.setVideoLicense(renderedVideoLicense);
         }
-        if (renderedVideoPaidProductPlacement != null) {
-            request.setVideoPaidProductPlacement(renderedVideoPaidProductPlacement.toApiValue());
+        if (renderedVideoPaidProductPlacement != null && !renderedVideoPaidProductPlacement.isEmpty()) {
+            request.setVideoPaidProductPlacement(renderedVideoPaidProductPlacement);
         }
-        if (renderedVideoSyndicated != null) {
-            request.setVideoSyndicated(renderedVideoSyndicated.toApiValue());
+        if (renderedVideoSyndicated != null && !renderedVideoSyndicated.isEmpty()) {
+            request.setVideoSyndicated(renderedVideoSyndicated);
         }
-        if (renderedVideoType != null) {
-            request.setVideoType(renderedVideoType.toApiValue());
+        if (renderedVideoType != null && !renderedVideoType.isEmpty()) {
+            request.setVideoType(renderedVideoType);
         }
-        if (renderedEventType != null) {
-            request.setEventType(renderedEventType.toApiValue());
+        if (renderedEventType != null && !renderedEventType.isEmpty()) {
+            request.setEventType(renderedEventType);
         }
 
         // Channel-specific filters
-        if (renderedChannelType != null) {
-            request.setChannelType(renderedChannelType.toApiValue());
+        if (renderedChannelType != null && !renderedChannelType.isEmpty()) {
+            request.setChannelType(renderedChannelType);
         }
 
         // Special filters
@@ -373,7 +371,8 @@ public class Search extends AbstractYoutubeTask implements RunnableTask<SearchOu
             // Build the Snippet object
             SearchResultSnippet snippet = SearchResultSnippet.builder()
                     .publishedAt(result.getSnippet().getPublishedAt() != null
-                            ? Instant.ofEpochMilli(result.getSnippet().getPublishedAt().getValue())
+                            ? Instant.ofEpochMilli(
+                                    result.getSnippet().getPublishedAt().getValue())
                             : null)
                     .channelId(result.getSnippet().getChannelId())
                     .title(result.getSnippet().getTitle())

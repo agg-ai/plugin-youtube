@@ -8,6 +8,7 @@ import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+import io.kestra.plugin.youtube.helpers.PropertyHelper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -88,7 +89,11 @@ public class SetThumbnail extends AbstractYoutubeTask implements RunnableTask<Se
                 () -> new IllegalArgumentException("videoId is required"));
         String renderedThumbnailData = runContext.render(this.thumbnailData).as(String.class).orElseThrow(
                 () -> new IllegalArgumentException("thumbnailData is required"));
-        String renderedMimeType = runContext.render(this.mimeType).as(String.class).orElse("application/octet-stream");
+        String renderedMimeType = PropertyHelper.safeRender(runContext, this.mimeType, "application/octet-stream",
+                String.class);
+        renderedMimeType = renderedMimeType.isEmpty()
+                ? "application/octet-stream"
+                : renderedMimeType;
 
         // Decode Base64 data
         byte[] imageBytes;

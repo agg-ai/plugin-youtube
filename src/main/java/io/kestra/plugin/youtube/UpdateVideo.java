@@ -9,6 +9,7 @@ import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+import io.kestra.plugin.youtube.helpers.PropertyHelper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -87,14 +88,10 @@ public class UpdateVideo extends AbstractYoutubeTask implements RunnableTask<Upd
         // Render all parameters
         String renderedVideoId = runContext.render(this.videoId).as(String.class).orElseThrow(
                 () -> new IllegalArgumentException("videoId is required"));
-        String renderedTitle = this.snippetTitle != null
-                ? runContext.render(this.snippetTitle).as(String.class).orElse(null)
-                : null;
-        String renderedDescription = this.snippetDescription != null
-                ? runContext.render(this.snippetDescription).as(String.class).orElse(null)
-                : null;
-        List<String> renderedTags = this.snippetTags != null ? runContext.render(this.snippetTags).asList(String.class)
-                : null;
+        String renderedTitle = PropertyHelper.safeRender(runContext, this.snippetTitle, null, String.class);
+        String renderedDescription = PropertyHelper.safeRender(runContext, this.snippetDescription, null, String.class);
+        List<String> renderedTags = PropertyHelper.safeRenderList(runContext, this.snippetTags, null,
+                String.class);
 
         // First, get the current video to preserve existing data
         Video currentVideo = getCurrentVideo(youtube, renderedVideoId);
@@ -147,10 +144,10 @@ public class UpdateVideo extends AbstractYoutubeTask implements RunnableTask<Upd
 
         VideoSnippet snippet = currentVideo.getSnippet();
 
-        if (title != null) {
+        if (title != null && !title.isEmpty()) {
             snippet.setTitle(title);
         }
-        if (description != null) {
+        if (description != null && !description.isEmpty()) {
             snippet.setDescription(description);
         }
         if (tags != null) {

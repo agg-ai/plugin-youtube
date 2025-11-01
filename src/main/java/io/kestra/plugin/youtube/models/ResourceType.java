@@ -1,9 +1,9 @@
 package io.kestra.plugin.youtube.models;
 
 public enum ResourceType {
-    VIDEO,
-    CHANNEL,
-    PLAYLIST;
+    video,
+    channel,
+    playlist;
 
     public String toApiValue() {
         return this.name().toLowerCase();

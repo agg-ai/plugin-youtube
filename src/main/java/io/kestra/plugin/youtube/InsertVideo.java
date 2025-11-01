@@ -11,9 +11,9 @@ import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
-import io.kestra.plugin.youtube.models.VideoCategory;
-import io.kestra.plugin.youtube.models.VideoPrivacyStatus;
 import io.kestra.plugin.youtube.helpers.EnumHelper;
+import io.kestra.plugin.youtube.helpers.PropertyHelper;
+import io.kestra.plugin.youtube.models.VideoCategory;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -47,12 +47,12 @@ import java.util.List;
                     videoFileUrl: "{{ inputs.video_url }}"
                     snippetTitle: "My Video Title"
                     snippetDescription: "This is a description of the video."
-                    snippetCategory: MUSIC
+                    snippetCategory: "10"
                     snippetTags:
                       - "music"
                       - "live"
                       - "concert"
-                    privacyStatus: PUBLIC
+                    privacyStatus: public
                 """),
         @Example(title = "Upload a private video with tags", code = """
                   - id: upload_private_video
@@ -61,11 +61,11 @@ import java.util.List;
                     videoFileUrl: "https://example.com/myvideo.mp4"
                     snippetTitle: "Private Video"
                     snippetDescription: "This video is private."
-                    snippetCategory: EDUCATION
+                    snippetCategory: "27"
                     snippetTags:
                       - "tutorial"
                       - "education"
-                    privacyStatus: PRIVATE
+                    privacyStatus: private
                 """),
         @Example(title = "Upload a video with minimal fields", code = """
                   - id: upload_minimal_video
@@ -74,7 +74,7 @@ import java.util.List;
                     videoFileUrl: "https://example.com/shortclip.mp4"
                     snippetTitle: "Short Clip"
                     snippetDescription: "A short video."
-                    snippetCategory: ENTERTAINMENT
+                    snippetCategory: "24"
                 """)
 })
 public class InsertVideo extends AbstractYoutubeTask implements RunnableTask<InsertVideo.Output> {
@@ -90,16 +90,17 @@ public class InsertVideo extends AbstractYoutubeTask implements RunnableTask<Ins
     @NotNull
     private Property<String> snippetDescription;
 
-    @Schema(title = "Snippet Category", description = "The video's category. Possible values: FILM_ANIMATION, AUTOS_VEHICLES, MUSIC, PETS_ANIMALS, SPORTS, SHORT_MOVIES, TRAVEL_EVENTS, GAMING, VIDEOBLOGGING, PEOPLE_BLOGS, COMEDY, ENTERTAINMENT, NEWS_POLITICS, HOWTO_STYLE, EDUCATION, SCIENCE_TECHNOLOGY, NONPROFITS_ACTIVISM, MOVIES, ANIME_ANIMATION, ACTION_ADVENTURE, CLASSICS, COMEDY_2, DOCUMENTARY, DRAMA, FAMILY, FOREIGN, HORROR, SCIFI_FANTASY, THRILLER, SHORTS, SHOWS, TRAILERS.")
+    @Schema(title = "Snippet Category", description = "The video's category ID. Common values: 1 (Film & Animation), 2 (Autos & Vehicles), 10 (Music), 15 (Pets & Animals), 17 (Sports), 18 (Short Movies), 19 (Travel & Events), 20 (Gaming), 21 (Videoblogging), 22 (People & Blogs), 23 (Comedy), 24 (Entertainment), 25 (News & Politics), 26 (Howto & Style), 27 (Education), 28 (Science & Technology), 29 (Nonprofits & Activism), 30 (Movies), 31 (Anime/Animation), 32 (Action/Adventure), 33 (Classics), 34 (Comedy), 35 (Documentary), 36 (Drama), 37 (Family), 38 (Foreign), 39 (Horror), 40 (Sci-Fi/Fantasy), 41 (Thriller), 42 (Shorts), 43 (Shows), 44 (Trailers).")
     @NotNull
     private Property<VideoCategory> snippetCategory;
 
     @Schema(title = "Snippet Tags", description = "A list of keyword tags associated with the video.")
     private Property<List<String>> snippetTags;
 
-    @Schema(title = "Privacy status", description = "The video's privacy status. Possible value: PUBLIC, PRIVATE, UNLISTED.")
+    @Schema(title = "Privacy status", description = "The video's privacy status.", allowableValues = { "public",
+            "private", "unlisted" })
     @Builder.Default
-    private Property<VideoPrivacyStatus> privacyStatus = Property.ofValue(VideoPrivacyStatus.PUBLIC);
+    private Property<String> privacyStatus = Property.ofValue("public");
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -113,10 +114,13 @@ public class InsertVideo extends AbstractYoutubeTask implements RunnableTask<Ins
                 () -> new IllegalArgumentException("snippetDescription is required"));
         VideoCategory renderedCategory = EnumHelper.safeRenderEnum(runContext, this.snippetCategory,
                 VideoCategory.class);
-        List<String> renderedTags = this.snippetTags != null ? runContext.render(this.snippetTags).asList(String.class)
-                : List.of();
-        VideoPrivacyStatus renderedPrivacyStatus = EnumHelper.safeRenderEnum(runContext, this.privacyStatus,
-                VideoPrivacyStatus.class);
+        List<String> renderedTags = PropertyHelper.safeRenderList(runContext, this.snippetTags, List.of(),
+                String.class);
+        String renderedPrivacyStatus = PropertyHelper.safeRender(runContext, this.privacyStatus, "public",
+                String.class);
+        renderedPrivacyStatus = renderedPrivacyStatus.isEmpty()
+                ? "public"
+                : renderedPrivacyStatus;
 
         Video video = new Video();
         VideoSnippet snippet = new VideoSnippet();
@@ -127,7 +131,7 @@ public class InsertVideo extends AbstractYoutubeTask implements RunnableTask<Ins
         video.setSnippet(snippet);
 
         VideoStatus status = new VideoStatus();
-        status.setPrivacyStatus(renderedPrivacyStatus.toApiValue());
+        status.setPrivacyStatus(renderedPrivacyStatus);
         video.setStatus(status);
 
         InputStream inputStream = new URI(renderedVideoFileUrl).toURL().openStream();

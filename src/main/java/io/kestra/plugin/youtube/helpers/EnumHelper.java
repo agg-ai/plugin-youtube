@@ -63,6 +63,12 @@ public class EnumHelper {
         return null;
     }
 
+    public static <T extends Enum<T>> T safeRenderEnum(RunContext runContext, Property property, Class<T> enumClass,
+            T defaultValue) {
+        T result = safeRenderEnum(runContext, property, enumClass);
+        return result != null ? result : defaultValue;
+    }
+
     /**
      * Safely render list of enums with case-insensitive parsing
      */
